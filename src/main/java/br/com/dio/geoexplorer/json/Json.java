@@ -17,61 +17,63 @@ import java.util.Map;
  */
 public final class Json {
 
+    private static final char PRIMEIRO_CARACTERE_IMPRIMIVEL = 0x20;
+    private static final int DIGITOS_UNICODE = 4;
+
     private Json() {
     }
 
     // ------------------------------------------------------------------ leitura
 
     public static Object parse(String texto) {
-        if (texto == null) {
+        if (texto == null)
             throw new JsonException("Texto JSON nulo");
-        }
+
         var parser = new Parser(texto);
         parser.pularEspacos();
         Object valor = parser.lerValor();
         parser.pularEspacos();
-        if (!parser.fim()) {
+
+        if (!parser.fim())
             throw parser.erro("Conteúdo inesperado após o fim do JSON");
-        }
+
         return valor;
     }
 
     @SuppressWarnings("unchecked")
     public static Map<String, Object> parseObject(String texto) {
-        Object valor = parse(texto);
-        if (valor instanceof Map<?, ?> mapa) {
+        if (parse(texto) instanceof Map<?, ?> mapa)
             return (Map<String, Object>) mapa;
-        }
+
         throw new JsonException("Esperado um objeto JSON");
     }
 
     private static final class Parser {
-        private final String s;
+        private final String texto;
         private int pos;
 
-        Parser(String s) {
-            this.s = s;
+        Parser(String texto) {
+            this.texto = texto;
         }
 
         boolean fim() {
-            return pos >= s.length();
+            return pos >= texto.length();
         }
 
-        JsonException erro(String msg) {
-            return new JsonException(msg + " (posição " + pos + ")");
+        JsonException erro(String mensagem) {
+            return new JsonException(mensagem + " (posição " + pos + ")");
         }
 
         void pularEspacos() {
-            while (!fim() && Character.isWhitespace(s.charAt(pos))) {
+            while (!fim() && Character.isWhitespace(atual()))
                 pos++;
-            }
         }
 
         Object lerValor() {
-            if (fim()) {
+            if (fim())
                 throw erro("Fim inesperado do JSON");
-            }
-            char c = s.charAt(pos);
+
+            char c = atual();
             return switch (c) {
                 case '{' -> lerObjeto();
                 case '[' -> lerArray();
@@ -80,18 +82,34 @@ public final class Json {
                 case 'f' -> lerLiteral("false", Boolean.FALSE);
                 case 'n' -> lerLiteral("null", null);
                 default -> {
-                    if (c == '-' || Character.isDigit(c)) {
+                    if (c == '-' || Character.isDigit(c))
                         yield lerNumero();
-                    }
+
                     throw erro("Caractere inesperado '" + c + "'");
                 }
             };
         }
 
+        private char atual() {
+            return texto.charAt(pos);
+        }
+
+        private char proximo() {
+            return texto.charAt(pos++);
+        }
+
+        private boolean consumirSe(char esperado) {
+            if (fim() || atual() != esperado)
+                return false;
+
+            pos++;
+            return true;
+        }
+
         private Object lerLiteral(String literal, Object valor) {
-            if (!s.startsWith(literal, pos)) {
+            if (!texto.startsWith(literal, pos))
                 throw erro("Literal inválido");
-            }
+
             pos += literal.length();
             return valor;
         }
@@ -100,133 +118,138 @@ public final class Json {
             var mapa = new LinkedHashMap<String, Object>();
             pos++; // {
             pularEspacos();
-            if (!fim() && s.charAt(pos) == '}') {
-                pos++;
+
+            if (consumirSe('}'))
                 return mapa;
-            }
-            while (true) {
+
+            do {
                 pularEspacos();
-                if (fim() || s.charAt(pos) != '"') {
-                    throw erro("Esperada chave entre aspas");
-                }
-                String chave = lerString();
+                String chave = lerChave();
                 pularEspacos();
                 esperar(':');
                 pularEspacos();
                 mapa.put(chave, lerValor());
                 pularEspacos();
-                if (fim()) {
-                    throw erro("Objeto não fechado");
-                }
-                char c = s.charAt(pos++);
-                if (c == '}') {
-                    return mapa;
-                }
-                if (c != ',') {
-                    throw erro("Esperado ',' ou '}'");
-                }
-            }
+            } while (lerSeparador('}', "Objeto não fechado"));
+
+            return mapa;
+        }
+
+        private String lerChave() {
+            if (fim() || atual() != '"')
+                throw erro("Esperada chave entre aspas");
+
+            return lerString();
         }
 
         private List<Object> lerArray() {
             var lista = new ArrayList<Object>();
             pos++; // [
             pularEspacos();
-            if (!fim() && s.charAt(pos) == ']') {
-                pos++;
+
+            if (consumirSe(']'))
                 return lista;
-            }
-            while (true) {
+
+            do {
                 pularEspacos();
                 lista.add(lerValor());
                 pularEspacos();
-                if (fim()) {
-                    throw erro("Array não fechado");
-                }
-                char c = s.charAt(pos++);
-                if (c == ']') {
-                    return lista;
-                }
-                if (c != ',') {
-                    throw erro("Esperado ',' ou ']'");
-                }
-            }
+            } while (lerSeparador(']', "Array não fechado"));
+
+            return lista;
+        }
+
+        /** Lê ',' (devolve true para continuar) ou o fechamento (devolve false). */
+        private boolean lerSeparador(char fechamento, String mensagemNaoFechado) {
+            if (fim())
+                throw erro(mensagemNaoFechado);
+
+            char c = proximo();
+
+            if (c == fechamento)
+                return false;
+
+            if (c != ',')
+                throw erro("Esperado ',' ou '" + fechamento + "'");
+
+            return true;
         }
 
         private String lerString() {
             pos++; // aspas de abertura
             var sb = new StringBuilder();
+
             while (true) {
-                if (fim()) {
+                if (fim())
                     throw erro("String não fechada");
-                }
-                char c = s.charAt(pos++);
-                if (c == '"') {
+
+                char c = proximo();
+
+                if (c == '"')
                     return sb.toString();
-                }
-                if (c != '\\') {
+
+                if (c == '\\')
+                    sb.append(lerEscape());
+                else
                     sb.append(c);
-                    continue;
-                }
-                if (fim()) {
-                    throw erro("Escape incompleto");
-                }
-                char e = s.charAt(pos++);
-                switch (e) {
-                    case '"' -> sb.append('"');
-                    case '\\' -> sb.append('\\');
-                    case '/' -> sb.append('/');
-                    case 'b' -> sb.append('\b');
-                    case 'f' -> sb.append('\f');
-                    case 'n' -> sb.append('\n');
-                    case 'r' -> sb.append('\r');
-                    case 't' -> sb.append('\t');
-                    case 'u' -> {
-                        if (pos + 4 > s.length()) {
-                            throw erro("Escape unicode incompleto");
-                        }
-                        try {
-                            sb.append((char) Integer.parseInt(s.substring(pos, pos + 4), 16));
-                        } catch (NumberFormatException ex) {
-                            throw erro("Escape unicode inválido");
-                        }
-                        pos += 4;
-                    }
-                    default -> throw erro("Escape inválido '\\" + e + "'");
-                }
+            }
+        }
+
+        private char lerEscape() {
+            if (fim())
+                throw erro("Escape incompleto");
+
+            char escape = proximo();
+            return switch (escape) {
+                case '"' -> '"';
+                case '\\' -> '\\';
+                case '/' -> '/';
+                case 'b' -> '\b';
+                case 'f' -> '\f';
+                case 'n' -> '\n';
+                case 'r' -> '\r';
+                case 't' -> '\t';
+                case 'u' -> lerUnicode();
+                default -> throw erro("Escape inválido '\\" + escape + "'");
+            };
+        }
+
+        private char lerUnicode() {
+            if (pos + DIGITOS_UNICODE > texto.length())
+                throw erro("Escape unicode incompleto");
+
+            try {
+                char c = (char) Integer.parseInt(texto.substring(pos, pos + DIGITOS_UNICODE), 16);
+                pos += DIGITOS_UNICODE;
+                return c;
+            } catch (NumberFormatException e) {
+                throw erro("Escape unicode inválido");
             }
         }
 
         private Object lerNumero() {
             int inicio = pos;
-            if (s.charAt(pos) == '-') {
-                pos++;
-            }
+            consumirSe('-');
             boolean decimal = false;
-            while (!fim()) {
-                char c = s.charAt(pos);
-                if (Character.isDigit(c)) {
-                    pos++;
-                } else if (c == '.' || c == 'e' || c == 'E' || c == '+' || c == '-') {
-                    decimal = true;
-                    pos++;
-                } else {
-                    break;
-                }
-            }
-            String num = s.substring(inicio, pos);
+
+            while (!fim() && ehParteDeNumero(atual()))
+                decimal |= !Character.isDigit(proximo());
+
+            String numero = texto.substring(inicio, pos);
             try {
-                return decimal ? (Object) Double.parseDouble(num) : (Object) Long.parseLong(num);
-            } catch (NumberFormatException ex) {
-                throw erro("Número inválido '" + num + "'");
+                return decimal ? (Object) Double.parseDouble(numero) : (Object) Long.parseLong(numero);
+            } catch (NumberFormatException e) {
+                throw erro("Número inválido '" + numero + "'");
             }
         }
 
-        private void esperar(char c) {
-            if (fim() || s.charAt(pos) != c) {
-                throw erro("Esperado '" + c + "'");
-            }
-            pos++;
+        private static boolean ehParteDeNumero(char c) {
+            return Character.isDigit(c) || c == '.' || c == 'e' || c == 'E' || c == '+' || c == '-';
+        }
+
+        private void esperar(char esperado) {
+            if (!consumirSe(esperado))
+                throw erro("Esperado '" + esperado + "'");
         }
     }
 
@@ -246,57 +269,59 @@ public final class Json {
             case Double d when d.isNaN() || d.isInfinite() -> sb.append("null");
             case Float f when f.isNaN() || f.isInfinite() -> sb.append("null");
             case Number n -> sb.append(n);
-            case Map<?, ?> mapa -> {
-                sb.append('{');
-                boolean primeiro = true;
-                for (var entrada : mapa.entrySet()) {
-                    if (!primeiro) {
-                        sb.append(',');
-                    }
-                    primeiro = false;
-                    escreverString(sb, String.valueOf(entrada.getKey()));
-                    sb.append(':');
-                    escrever(sb, entrada.getValue());
-                }
-                sb.append('}');
-            }
-            case Iterable<?> lista -> {
-                sb.append('[');
-                boolean primeiro = true;
-                for (Object item : lista) {
-                    if (!primeiro) {
-                        sb.append(',');
-                    }
-                    primeiro = false;
-                    escrever(sb, item);
-                }
-                sb.append(']');
-            }
+            case Map<?, ?> mapa -> escreverObjeto(sb, mapa);
+            case Iterable<?> lista -> escreverArray(sb, lista);
             default -> escreverString(sb, valor.toString());
         }
     }
 
+    private static void escreverObjeto(StringBuilder sb, Map<?, ?> mapa) {
+        sb.append('{');
+        String separador = "";
+
+        for (var entrada : mapa.entrySet()) {
+            sb.append(separador);
+            escreverString(sb, String.valueOf(entrada.getKey()));
+            sb.append(':');
+            escrever(sb, entrada.getValue());
+            separador = ",";
+        }
+
+        sb.append('}');
+    }
+
+    private static void escreverArray(StringBuilder sb, Iterable<?> lista) {
+        sb.append('[');
+        String separador = "";
+
+        for (Object item : lista) {
+            sb.append(separador);
+            escrever(sb, item);
+            separador = ",";
+        }
+
+        sb.append(']');
+    }
+
     private static void escreverString(StringBuilder sb, String texto) {
         sb.append('"');
-        for (int i = 0; i < texto.length(); i++) {
-            char c = texto.charAt(i);
-            switch (c) {
-                case '"' -> sb.append("\\\"");
-                case '\\' -> sb.append("\\\\");
-                case '\n' -> sb.append("\\n");
-                case '\r' -> sb.append("\\r");
-                case '\t' -> sb.append("\\t");
-                case '\b' -> sb.append("\\b");
-                case '\f' -> sb.append("\\f");
-                default -> {
-                    if (c < 0x20) {
-                        sb.append(String.format("\\u%04x", (int) c));
-                    } else {
-                        sb.append(c);
-                    }
-                }
-            }
-        }
+
+        for (char c : texto.toCharArray())
+            sb.append(escapar(c));
+
         sb.append('"');
+    }
+
+    private static String escapar(char c) {
+        return switch (c) {
+            case '"' -> "\\\"";
+            case '\\' -> "\\\\";
+            case '\n' -> "\\n";
+            case '\r' -> "\\r";
+            case '\t' -> "\\t";
+            case '\b' -> "\\b";
+            case '\f' -> "\\f";
+            default -> c < PRIMEIRO_CARACTERE_IMPRIMIVEL ? String.format("\\u%04x", (int) c) : String.valueOf(c);
+        };
     }
 }

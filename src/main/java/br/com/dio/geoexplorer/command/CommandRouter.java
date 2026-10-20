@@ -17,6 +17,9 @@ import java.util.Map;
  */
 public final class CommandRouter {
 
+    private static final String PREFIXO = "/";
+    private static final String DICA_HELP = " Use /help para ver as opções.";
+
     private final Map<String, Comando> comandos = new LinkedHashMap<>();
 
     public CommandRouter(ExplorerService servico, Path pastaSaida) {
@@ -27,8 +30,8 @@ public final class CommandRouter {
         registrar(new Comandos.HelpComando(servico, this));
     }
 
-    private void registrar(Comando c) {
-        comandos.put(c.nome(), c);
+    private void registrar(Comando comando) {
+        comandos.put(comando.nome(), comando);
     }
 
     public Collection<Comando> comandos() {
@@ -42,59 +45,93 @@ public final class CommandRouter {
     public Resultado executar(String linha) {
         try {
             List<String> partes = tokenizar(linha == null ? "" : linha.strip());
-            if (partes.isEmpty()) {
-                throw new GeoExplorerException("Digite um comando. Use /help para ver as opções.");
-            }
-            String primeiro = partes.getFirst();
-            if (!primeiro.startsWith("/")) {
-                throw new GeoExplorerException("Comandos começam com '/'. Use /help para ver as opções.");
-            }
-            String nome = primeiro.substring(1).toLowerCase(Locale.ROOT);
-            Comando comando = comandos.get(nome);
-            if (comando == null) {
-                throw new GeoExplorerException("Comando desconhecido: /" + nome + ". Use /help para ver as opções.");
-            }
+            Comando comando = localizarComando(partes);
             return Resultado.ok(comando.executar(partes.subList(1, partes.size())));
         } catch (GeoExplorerException e) {
             return Resultado.erro(e.getMessage());
         }
     }
 
+    private Comando localizarComando(List<String> partes) {
+        if (partes.isEmpty())
+            throw new GeoExplorerException("Digite um comando." + DICA_HELP);
+
+        String primeiro = partes.getFirst();
+
+        if (!primeiro.startsWith(PREFIXO))
+            throw new GeoExplorerException("Comandos começam com '" + PREFIXO + "'." + DICA_HELP);
+
+        String nome = primeiro.substring(PREFIXO.length()).toLowerCase(Locale.ROOT);
+        Comando comando = comandos.get(nome);
+
+        if (comando == null)
+            throw new GeoExplorerException("Comando desconhecido: " + PREFIXO + nome + "." + DICA_HELP);
+
+        return comando;
+    }
+
     /** Separa por espaços, mantendo juntos os trechos entre aspas simples ou duplas. */
     static List<String> tokenizar(String linha) {
-        List<String> tokens = new ArrayList<>();
-        var atual = new StringBuilder();
-        char aspas = 0;
-        boolean temToken = false;
-        for (int i = 0; i < linha.length(); i++) {
-            char c = linha.charAt(i);
-            if (aspas != 0) {
-                if (c == aspas) {
-                    aspas = 0;
-                } else {
-                    atual.append(c);
-                }
-            } else if (c == '"' || c == '\'') {
-                aspas = c;
-                temToken = true;
-            } else if (Character.isWhitespace(c)) {
-                if (temToken) {
-                    tokens.add(atual.toString());
-                    atual.setLength(0);
-                    temToken = false;
-                }
-            } else {
+        var tokenizador = new Tokenizador();
+
+        for (char c : linha.toCharArray())
+            tokenizador.consumir(c);
+
+        return tokenizador.finalizar();
+    }
+
+    private static final class Tokenizador {
+        private static final char SEM_ASPAS = 0;
+
+        private final List<String> tokens = new ArrayList<>();
+        private final StringBuilder atual = new StringBuilder();
+        private char aspasAbertas = SEM_ASPAS;
+        private boolean temToken;
+
+        void consumir(char c) {
+            if (aspasAbertas != SEM_ASPAS)
+                consumirDentroDeAspas(c);
+            else if (c == '"' || c == '\'')
+                abrirAspas(c);
+            else if (Character.isWhitespace(c))
+                fecharToken();
+            else
+                acrescentar(c);
+        }
+
+        List<String> finalizar() {
+            if (aspasAbertas != SEM_ASPAS)
+                throw new GeoExplorerException("Aspas não fechadas no comando.");
+
+            fecharToken();
+            return tokens;
+        }
+
+        private void consumirDentroDeAspas(char c) {
+            if (c == aspasAbertas)
+                aspasAbertas = SEM_ASPAS;
+            else
                 atual.append(c);
-                temToken = true;
-            }
         }
-        if (aspas != 0) {
-            throw new GeoExplorerException("Aspas não fechadas no comando.");
+
+        private void abrirAspas(char aspas) {
+            aspasAbertas = aspas;
+            temToken = true;
         }
-        if (temToken) {
+
+        private void acrescentar(char c) {
+            atual.append(c);
+            temToken = true;
+        }
+
+        private void fecharToken() {
+            if (!temToken)
+                return;
+
             tokens.add(atual.toString());
+            atual.setLength(0);
+            temToken = false;
         }
-        return tokens;
     }
 
     /** Resultado da execução de um comando. */

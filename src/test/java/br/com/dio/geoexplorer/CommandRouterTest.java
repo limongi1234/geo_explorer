@@ -31,9 +31,9 @@ class CommandRouterTest {
     void help() {
         Resultado r = roteador.executar("/help");
         assertTrue(r.sucesso());
-        for (String cmd : new String[]{"/trilha", "/desafio", "/certificado", "/cards", "/help"}) {
-            assertTrue(r.texto().contains(cmd), "faltou " + cmd);
-        }
+        for (String comando : new String[]{"/trilha", "/desafio", "/certificado", "/cards", "/help"})
+            assertTrue(r.texto().contains(comando), "faltou " + comando);
+
         assertTrue(r.texto().contains("| Python |"));
     }
 

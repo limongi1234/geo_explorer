@@ -1,5 +1,6 @@
 package br.com.dio.geoexplorer;
 
+import br.com.dio.geoexplorer.model.Modulo;
 import br.com.dio.geoexplorer.model.Nivel;
 import br.com.dio.geoexplorer.model.Trilha;
 import br.com.dio.geoexplorer.repository.TrilhaRepository;
@@ -40,14 +41,15 @@ class TrilhaRepositoryTest {
     @Test
     @DisplayName("toda trilha tem módulos, cards e desafio em todos os níveis")
     void integridadeDaBase() {
-        for (Trilha t : repo.listar()) {
-            assertFalse(t.modulos().isEmpty(), "sem módulos: " + t.id());
-            assertFalse(t.cards().isEmpty(), "sem cards: " + t.id());
-            for (Nivel n : Nivel.values()) {
-                assertFalse(t.desafiosDoNivel(n).isEmpty(), t.id() + " sem desafio " + n);
-            }
-            int somaHoras = t.modulos().stream().mapToInt(m -> m.horas()).sum();
-            assertEquals(t.cargaHoraria(), somaHoras, "carga horária inconsistente: " + t.id());
+        for (Trilha trilha : repo.listar()) {
+            assertFalse(trilha.modulos().isEmpty(), "sem módulos: " + trilha.id());
+            assertFalse(trilha.cards().isEmpty(), "sem cards: " + trilha.id());
+
+            for (Nivel nivel : Nivel.values())
+                assertFalse(trilha.desafiosDoNivel(nivel).isEmpty(), trilha.id() + " sem desafio " + nivel);
+
+            int somaHoras = trilha.modulos().stream().mapToInt(Modulo::horas).sum();
+            assertEquals(trilha.cargaHoraria(), somaHoras, "carga horária inconsistente: " + trilha.id());
         }
     }
 

@@ -11,12 +11,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * Acesso à base fictícia de trilhas (arquivo {@code trilhas.json}).
@@ -34,24 +34,32 @@ public final class TrilhaRepository {
     private TrilhaRepository(List<Trilha> trilhas) {
         var ids = new LinkedHashMap<String, Trilha>();
         var chaves = new LinkedHashMap<String, Trilha>();
-        for (Trilha t : trilhas) {
-            if (ids.putIfAbsent(t.id(), t) != null) {
-                throw new IllegalStateException("Trilha duplicada na base: " + t.id());
-            }
-            chaves.put(Nivel.normalizar(t.id()), t);
-            chaves.put(Nivel.normalizar(t.nome()), t);
-            t.aliases().forEach(a -> chaves.put(Nivel.normalizar(a), t));
+
+        for (Trilha trilha : trilhas) {
+            if (ids.putIfAbsent(trilha.id(), trilha) != null)
+                throw new IllegalStateException("Trilha duplicada na base: " + trilha.id());
+
+            indexarChaves(chaves, trilha);
         }
+
         this.porId = Collections.unmodifiableMap(ids);
         this.porChave = Collections.unmodifiableMap(chaves);
+    }
+
+    private static void indexarChaves(Map<String, Trilha> chaves, Trilha trilha) {
+        chaves.put(Nivel.normalizar(trilha.id()), trilha);
+        chaves.put(Nivel.normalizar(trilha.nome()), trilha);
+
+        for (String alias : trilha.aliases())
+            chaves.put(Nivel.normalizar(alias), trilha);
     }
 
     /** Carrega a base embutida no JAR. */
     public static TrilhaRepository carregarPadrao() {
         try (InputStream in = TrilhaRepository.class.getResourceAsStream(RECURSO_PADRAO)) {
-            if (in == null) {
+            if (in == null)
                 throw new IllegalStateException("Base de trilhas não encontrada: " + RECURSO_PADRAO);
-            }
+
             return deJson(new String(in.readAllBytes(), StandardCharsets.UTF_8));
         } catch (IOException e) {
             throw new UncheckedIOException("Falha ao ler a base de trilhas", e);
@@ -61,17 +69,13 @@ public final class TrilhaRepository {
     /** Monta o repositório a partir de um JSON (útil em testes). */
     public static TrilhaRepository deJson(String json) {
         Map<String, Object> raiz = Json.parseObject(json);
-        List<Trilha> trilhas = new ArrayList<>();
-        for (Object item : lista(raiz, "trilhas")) {
-            trilhas.add(paraTrilha(mapa(item)));
-        }
-        return new TrilhaRepository(trilhas);
+        return new TrilhaRepository(converter(raiz, "trilhas", TrilhaRepository::paraTrilha));
     }
 
     public Optional<Trilha> buscar(String tecnologia) {
-        if (tecnologia == null || tecnologia.isBlank()) {
+        if (tecnologia == null || tecnologia.isBlank())
             return Optional.empty();
-        }
+
         return Optional.ofNullable(porChave.get(Nivel.normalizar(tecnologia)));
     }
 
@@ -81,64 +85,76 @@ public final class TrilhaRepository {
 
     // ------------------------------------------------------------------ conversão
 
-    private static Trilha paraTrilha(Map<String, Object> m) {
-        String id = texto(m, "id");
-        List<Modulo> modulos = lista(m, "modulos").stream()
-                .map(TrilhaRepository::mapa)
-                .map(x -> new Modulo(texto(x, "titulo"), inteiro(x, "horas"), textos(x, "topicos")))
-                .toList();
-        List<Desafio> desafios = lista(m, "desafios").stream()
-                .map(TrilhaRepository::mapa)
-                .map(x -> new Desafio(
-                        Nivel.de(texto(x, "nivel")).orElseThrow(() ->
-                                new IllegalStateException("Nível inválido na trilha " + id + ": " + x.get("nivel"))),
-                        texto(x, "titulo"),
-                        texto(x, "descricao"),
-                        textos(x, "criterios")))
-                .toList();
-        List<Card> cards = lista(m, "cards").stream()
-                .map(TrilhaRepository::mapa)
-                .map(x -> new Card(texto(x, "categoria"), texto(x, "pergunta"), texto(x, "resposta")))
-                .toList();
-        return new Trilha(id, texto(m, "nome"), textos(m, "aliases"), texto(m, "descricao"),
-                inteiro(m, "cargaHoraria"), inteiro(m, "xp"), modulos, desafios, cards);
+    private static Trilha paraTrilha(Map<String, Object> objeto) {
+        String id = texto(objeto, "id");
+        return new Trilha(
+                id,
+                texto(objeto, "nome"),
+                textos(objeto, "aliases"),
+                texto(objeto, "descricao"),
+                inteiro(objeto, "cargaHoraria"),
+                inteiro(objeto, "xp"),
+                converter(objeto, "modulos", TrilhaRepository::paraModulo),
+                converter(objeto, "desafios", desafio -> paraDesafio(desafio, id)),
+                converter(objeto, "cards", TrilhaRepository::paraCard));
+    }
+
+    private static Modulo paraModulo(Map<String, Object> objeto) {
+        return new Modulo(texto(objeto, "titulo"), inteiro(objeto, "horas"), textos(objeto, "topicos"));
+    }
+
+    private static Desafio paraDesafio(Map<String, Object> objeto, String trilhaId) {
+        Nivel nivel = Nivel.de(texto(objeto, "nivel")).orElseThrow(() -> new IllegalStateException(
+                "Nível inválido na trilha " + trilhaId + ": " + objeto.get("nivel")));
+        return new Desafio(nivel, texto(objeto, "titulo"), texto(objeto, "descricao"), textos(objeto, "criterios"));
+    }
+
+    private static Card paraCard(Map<String, Object> objeto) {
+        return new Card(texto(objeto, "categoria"), texto(objeto, "pergunta"), texto(objeto, "resposta"));
+    }
+
+    private static <T> List<T> converter(Map<String, Object> objeto, String campo,
+                                         Function<Map<String, Object>, T> conversor) {
+        return lista(objeto, campo).stream().map(TrilhaRepository::mapa).map(conversor).toList();
     }
 
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> mapa(Object o) {
-        if (o instanceof Map<?, ?> m) {
-            return (Map<String, Object>) m;
-        }
+    private static Map<String, Object> mapa(Object valor) {
+        if (valor instanceof Map<?, ?> mapa)
+            return (Map<String, Object>) mapa;
+
         throw new IllegalStateException("Esperado objeto JSON na base de trilhas");
     }
 
-    private static List<?> lista(Map<String, Object> m, String campo) {
-        Object v = m.get(campo);
-        if (v == null) {
+    private static List<?> lista(Map<String, Object> objeto, String campo) {
+        Object valor = objeto.get(campo);
+
+        if (valor == null)
             return List.of();
-        }
-        if (v instanceof List<?> l) {
-            return l;
-        }
+
+        if (valor instanceof List<?> lista)
+            return lista;
+
         throw new IllegalStateException("Campo '" + campo + "' deveria ser uma lista");
     }
 
-    private static List<String> textos(Map<String, Object> m, String campo) {
-        return lista(m, campo).stream().map(String::valueOf).toList();
+    private static List<String> textos(Map<String, Object> objeto, String campo) {
+        return lista(objeto, campo).stream().map(String::valueOf).toList();
     }
 
-    private static String texto(Map<String, Object> m, String campo) {
-        Object v = m.get(campo);
-        if (v == null) {
+    private static String texto(Map<String, Object> objeto, String campo) {
+        Object valor = objeto.get(campo);
+
+        if (valor == null)
             throw new IllegalStateException("Campo obrigatório ausente: " + campo);
-        }
-        return v.toString();
+
+        return valor.toString();
     }
 
-    private static int inteiro(Map<String, Object> m, String campo) {
-        if (m.get(campo) instanceof Number n) {
-            return n.intValue();
-        }
+    private static int inteiro(Map<String, Object> objeto, String campo) {
+        if (objeto.get(campo) instanceof Number numero)
+            return numero.intValue();
+
         throw new IllegalStateException("Campo numérico ausente: " + campo);
     }
 }

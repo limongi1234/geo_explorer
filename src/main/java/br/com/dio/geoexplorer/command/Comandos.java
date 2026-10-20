@@ -35,7 +35,7 @@ final class Comandos {
 
         public String executar(List<String> args) {
             exigirEntre(args, 1, 2, uso());
-            return servico.gerarDesafio(args.getFirst(), args.size() > 1 ? args.get(1) : null);
+            return servico.gerarDesafio(args.getFirst(), argumentoOpcional(args, 1));
         }
     }
 
@@ -46,39 +46,50 @@ final class Comandos {
 
         public String executar(List<String> args) {
             exigirEntre(args, 2, 2, uso());
-            Certificado c = servico.gerarCertificado(args.get(0), args.get(1));
-            Path destino = pastaSaida.resolve(c.nomeArquivo()).normalize();
-            if (!destino.startsWith(pastaSaida.normalize())) {
+            Certificado certificado = servico.gerarCertificado(args.get(0), args.get(1));
+            Path destino = salvar(certificado);
+            return certificado.markdown() + "\n> Arquivo salvo em `" + destino + "`\n";
+        }
+
+        private Path salvar(Certificado certificado) {
+            Path destino = pastaSaida.resolve(certificado.nomeArquivo()).normalize();
+
+            if (!destino.startsWith(pastaSaida.normalize()))
                 throw new GeoExplorerException("Nome de arquivo inválido.");
-            }
+
             try {
                 Files.createDirectories(pastaSaida);
-                Files.writeString(destino, c.markdown(), StandardCharsets.UTF_8);
+                Files.writeString(destino, certificado.markdown(), StandardCharsets.UTF_8);
+                return destino;
             } catch (IOException e) {
                 throw new UncheckedIOException("Não foi possível salvar o certificado", e);
             }
-            return c.markdown() + "\n> Arquivo salvo em `" + destino + "`\n";
         }
     }
 
     record CardsComando(ExplorerService servico) implements Comando {
-        static final int PADRAO = 3;
-
         public String nome() { return "cards"; }
         public String uso() { return "/cards <tecnologia> [quantidade] [categoria]"; }
-        public String descricao() { return "Gera flash cards de revisão (padrão: " + PADRAO + ")."; }
+
+        public String descricao() {
+            return "Gera flash cards de revisão (padrão: " + ExplorerService.QUANTIDADE_PADRAO_CARDS + ").";
+        }
 
         public String executar(List<String> args) {
             exigirEntre(args, 1, 3, uso());
-            int quantidade = PADRAO;
-            if (args.size() > 1) {
-                try {
-                    quantidade = Integer.parseInt(args.get(1));
-                } catch (NumberFormatException e) {
-                    throw new GeoExplorerException("Quantidade deve ser um número inteiro. Uso: " + uso());
-                }
+            return servico.gerarCards(args.getFirst(), lerQuantidade(argumentoOpcional(args, 1)),
+                    argumentoOpcional(args, 2));
+        }
+
+        private int lerQuantidade(String texto) {
+            if (texto == null)
+                return ExplorerService.QUANTIDADE_PADRAO_CARDS;
+
+            try {
+                return Integer.parseInt(texto);
+            } catch (NumberFormatException e) {
+                throw new GeoExplorerException("Quantidade deve ser um número inteiro. Uso: " + uso());
             }
-            return servico.gerarCards(args.getFirst(), quantidade, args.size() > 2 ? args.get(2) : null);
         }
     }
 
@@ -90,16 +101,21 @@ final class Comandos {
         public String executar(List<String> args) {
             var md = new StringBuilder("# Geo-Explorer: comandos\n\n");
             md.append("| Comando | Descrição |\n|---|---|\n");
-            roteador.comandos().forEach(c ->
-                    md.append("| `").append(c.uso()).append("` | ").append(c.descricao()).append(" |\n"));
+
+            for (Comando comando : roteador.comandos())
+                md.append("| `").append(comando.uso()).append("` | ").append(comando.descricao()).append(" |\n");
+
             md.append("\n").append(servico.listarTecnologias());
             return md.toString();
         }
     }
 
     static void exigirEntre(List<String> args, int min, int max, String uso) {
-        if (args.size() < min || args.size() > max) {
+        if (args.size() < min || args.size() > max)
             throw new GeoExplorerException("Argumentos inválidos. Uso: " + uso);
-        }
+    }
+
+    private static String argumentoOpcional(List<String> args, int indice) {
+        return args.size() > indice ? args.get(indice) : null;
     }
 }

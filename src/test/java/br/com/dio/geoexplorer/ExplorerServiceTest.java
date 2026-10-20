@@ -42,10 +42,8 @@ class ExplorerServiceTest {
     @Test
     @DisplayName("/desafio respeita o nível pedido")
     void desafioNivel() {
-        for (int semente = 0; semente < 20; semente++) {
-            String md = TestSupport.servico(semente).gerarDesafio("java", "avancado");
-            assertTrue(md.contains("**Nível:** Avançado"));
-        }
+        for (int semente = 0; semente < 20; semente++)
+            assertTrue(TestSupport.servico(semente).gerarDesafio("java", "avancado").contains("**Nível:** Avançado"));
     }
 
     @Test

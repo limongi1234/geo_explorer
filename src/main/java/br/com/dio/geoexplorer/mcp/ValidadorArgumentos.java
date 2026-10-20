@@ -19,66 +19,74 @@ final class ValidadorArgumentos {
     @SuppressWarnings("unchecked")
     static List<String> validar(Map<String, Object> schema, Map<String, Object> args) {
         List<String> erros = new ArrayList<>();
-        Map<String, Object> props = (Map<String, Object>) schema.getOrDefault("properties", Map.of());
+        Map<String, Object> propriedades = (Map<String, Object>) schema.getOrDefault("properties", Map.of());
+        List<Object> obrigatorios = (List<Object>) schema.getOrDefault("required", List.of());
 
-        for (Object obrig : (List<Object>) schema.getOrDefault("required", List.of())) {
-            Object valor = args.get(obrig.toString());
-            if (valor == null || (valor instanceof String s && s.isBlank())) {
-                erros.add("Campo obrigatório ausente: " + obrig);
-            }
-        }
+        for (Object campo : obrigatorios)
+            if (estaAusente(args.get(campo.toString())))
+                erros.add("Campo obrigatório ausente: " + campo);
 
-        if (Boolean.FALSE.equals(schema.get("additionalProperties"))) {
-            for (String chave : args.keySet()) {
-                if (!props.containsKey(chave)) {
-                    erros.add("Campo não permitido: " + chave);
-                }
-            }
-        }
+        if (Boolean.FALSE.equals(schema.get("additionalProperties")))
+            for (String campo : args.keySet())
+                if (!propriedades.containsKey(campo))
+                    erros.add("Campo não permitido: " + campo);
 
-        for (var entrada : props.entrySet()) {
-            Object valor = args.get(entrada.getKey());
-            if (valor == null) {
-                continue;
-            }
-            Map<String, Object> regra = (Map<String, Object>) entrada.getValue();
-            String campo = entrada.getKey();
-            switch (String.valueOf(regra.get("type"))) {
-                case "string" -> {
-                    if (!(valor instanceof String s)) {
-                        erros.add(campo + " deve ser texto");
-                        continue;
-                    }
-                    if (regra.get("minLength") instanceof Number min && s.strip().length() < min.intValue()) {
-                        erros.add(campo + " deve ter ao menos " + min + " caractere(s)");
-                    }
-                    if (regra.get("maxLength") instanceof Number max && s.length() > max.intValue()) {
-                        erros.add(campo + " deve ter no máximo " + max + " caracteres");
-                    }
-                    if (regra.get("enum") instanceof List<?> opcoes && !opcoes.contains(s)) {
-                        erros.add(campo + " deve ser um de: " + opcoes);
-                    }
-                }
-                case "integer" -> {
-                    boolean inteiro = valor instanceof Long || valor instanceof Integer
-                            || (valor instanceof Double d && d == Math.rint(d) && !d.isInfinite());
-                    if (!inteiro) {
-                        erros.add(campo + " deve ser um número inteiro");
-                        continue;
-                    }
-                    long n = ((Number) valor).longValue();
-                    if (regra.get("minimum") instanceof Number min && n < min.longValue()) {
-                        erros.add(campo + " deve ser no mínimo " + min);
-                    }
-                    if (regra.get("maximum") instanceof Number max && n > max.longValue()) {
-                        erros.add(campo + " deve ser no máximo " + max);
-                    }
-                }
-                default -> {
-                    // tipos não usados no projeto
-                }
-            }
-        }
+        for (var entrada : propriedades.entrySet())
+            validarCampo(entrada.getKey(), (Map<String, Object>) entrada.getValue(), args.get(entrada.getKey()), erros);
+
         return erros;
+    }
+
+    private static boolean estaAusente(Object valor) {
+        return valor == null || (valor instanceof String texto && texto.isBlank());
+    }
+
+    private static void validarCampo(String campo, Map<String, Object> regra, Object valor, List<String> erros) {
+        if (valor == null)
+            return;
+
+        switch (String.valueOf(regra.get("type"))) {
+            case "string" -> validarTexto(campo, regra, valor, erros);
+            case "integer" -> validarInteiro(campo, regra, valor, erros);
+            default -> {
+                // tipos não usados no projeto
+            }
+        }
+    }
+
+    private static void validarTexto(String campo, Map<String, Object> regra, Object valor, List<String> erros) {
+        if (!(valor instanceof String texto)) {
+            erros.add(campo + " deve ser texto");
+            return;
+        }
+
+        if (regra.get("minLength") instanceof Number min && texto.strip().length() < min.intValue())
+            erros.add(campo + " deve ter ao menos " + min + " caractere(s)");
+
+        if (regra.get("maxLength") instanceof Number max && texto.length() > max.intValue())
+            erros.add(campo + " deve ter no máximo " + max + " caracteres");
+
+        if (regra.get("enum") instanceof List<?> opcoes && !opcoes.contains(texto))
+            erros.add(campo + " deve ser um de: " + opcoes);
+    }
+
+    private static void validarInteiro(String campo, Map<String, Object> regra, Object valor, List<String> erros) {
+        if (!ehInteiro(valor)) {
+            erros.add(campo + " deve ser um número inteiro");
+            return;
+        }
+
+        long numero = ((Number) valor).longValue();
+
+        if (regra.get("minimum") instanceof Number min && numero < min.longValue())
+            erros.add(campo + " deve ser no mínimo " + min);
+
+        if (regra.get("maximum") instanceof Number max && numero > max.longValue())
+            erros.add(campo + " deve ser no máximo " + max);
+    }
+
+    private static boolean ehInteiro(Object valor) {
+        return valor instanceof Long || valor instanceof Integer
+                || (valor instanceof Double d && d == Math.rint(d) && !d.isInfinite());
     }
 }

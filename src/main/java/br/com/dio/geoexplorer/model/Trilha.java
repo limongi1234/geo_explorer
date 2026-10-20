@@ -22,6 +22,6 @@ public record Trilha(
     }
 
     public List<Desafio> desafiosDoNivel(Nivel nivel) {
-        return desafios.stream().filter(d -> d.nivel() == nivel).toList();
+        return desafios.stream().filter(desafio -> desafio.nivel() == nivel).toList();
     }
 }

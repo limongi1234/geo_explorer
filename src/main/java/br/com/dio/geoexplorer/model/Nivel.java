@@ -30,12 +30,12 @@ public enum Nivel {
 
     /** Aceita "intermediário", "Intermediario", "INTERMEDIARIO" etc. */
     public static Optional<Nivel> de(String texto) {
-        if (texto == null || texto.isBlank()) {
+        if (texto == null || texto.isBlank())
             return Optional.empty();
-        }
+
         String normalizado = normalizar(texto);
         return Arrays.stream(values())
-                .filter(n -> n.codigo.equals(normalizado))
+                .filter(nivel -> nivel.codigo.equals(normalizado))
                 .findFirst();
     }
 

@@ -36,6 +36,8 @@ public final class McpServer {
     static final int INVALID_PARAMS = -32602;
     static final int INTERNAL_ERROR = -32603;
 
+    private static final String VERSAO_JSON_RPC = "2.0";
+
     private final Map<String, Ferramenta> ferramentas;
 
     public McpServer(ExplorerService servico) {
@@ -47,18 +49,22 @@ public final class McpServer {
         var leitor = new BufferedReader(new InputStreamReader(entrada, StandardCharsets.UTF_8));
         var escritor = new PrintStream(saida, true, StandardCharsets.UTF_8);
         log("Geo-Explorer MCP iniciado (" + ferramentas.size() + " ferramentas)");
+
         String linha;
-        while ((linha = leitor.readLine()) != null) {
-            if (linha.isBlank()) {
-                continue;
-            }
-            String resposta = processar(linha);
-            if (resposta != null) {
-                escritor.println(resposta);
-                escritor.flush();
-            }
-        }
+        while ((linha = leitor.readLine()) != null)
+            responder(escritor, linha);
+
         log("Entrada encerrada, servidor finalizado");
+    }
+
+    private void responder(PrintStream escritor, String linha) {
+        if (linha.isBlank())
+            return;
+
+        String resposta = processar(linha);
+
+        if (resposta != null)
+            escritor.println(resposta);
     }
 
     /**
@@ -66,53 +72,57 @@ public final class McpServer {
      * ou {@code null} quando a mensagem é uma notificação (sem id).
      */
     public String processar(String mensagem) {
-        Map<String, Object> req;
+        Map<String, Object> requisicao;
         try {
-            req = Json.parseObject(mensagem);
+            requisicao = Json.parseObject(mensagem);
         } catch (JsonException e) {
             return Json.stringify(erro(null, PARSE_ERROR, "JSON inválido: " + e.getMessage()));
         }
 
-        Object id = req.get("id");
-        boolean notificacao = !req.containsKey("id");
-        if (!"2.0".equals(req.get("jsonrpc")) || !(req.get("method") instanceof String metodo)) {
-            return notificacao ? null : Json.stringify(erro(id, INVALID_REQUEST, "Requisição JSON-RPC inválida"));
-        }
+        Object id = requisicao.get("id");
+        boolean notificacao = !requisicao.containsKey("id");
+
+        if (!VERSAO_JSON_RPC.equals(requisicao.get("jsonrpc")) || !(requisicao.get("method") instanceof String metodo))
+            return responderErro(notificacao, id, INVALID_REQUEST, "Requisição JSON-RPC inválida");
 
         try {
-            Map<String, Object> params = req.get("params") instanceof Map<?, ?> p ? cast(p) : Map.of();
-            Object resultado = switch (metodo) {
-                case "initialize" -> inicializar(params);
-                case "ping" -> Map.of();
-                case "tools/list" -> listarFerramentas();
-                case "tools/call" -> chamarFerramenta(params);
-                case "notifications/initialized", "notifications/cancelled" -> null;
-                default -> throw new ErroRpc(METHOD_NOT_FOUND, "Método não suportado: " + metodo);
-            };
-            if (notificacao) {
-                return null;
-            }
-            return Json.stringify(sucesso(id, resultado == null ? Map.of() : resultado));
+            Object resultado = despachar(metodo, parametros(requisicao));
+            return notificacao ? null : Json.stringify(sucesso(id, resultado == null ? Map.of() : resultado));
         } catch (ErroRpc e) {
-            return notificacao ? null : Json.stringify(erro(id, e.codigo, e.getMessage()));
+            return responderErro(notificacao, id, e.codigo, e.getMessage());
         } catch (RuntimeException e) {
             log("Erro interno: " + e);
-            return notificacao ? null : Json.stringify(erro(id, INTERNAL_ERROR, "Erro interno do servidor"));
+            return responderErro(notificacao, id, INTERNAL_ERROR, "Erro interno do servidor");
         }
+    }
+
+    private Object despachar(String metodo, Map<String, Object> params) {
+        return switch (metodo) {
+            case "initialize" -> inicializar(params);
+            case "ping" -> Map.of();
+            case "tools/list" -> listarFerramentas();
+            case "tools/call" -> chamarFerramenta(params);
+            case "notifications/initialized", "notifications/cancelled" -> null;
+            default -> throw new ErroRpc(METHOD_NOT_FOUND, "Método não suportado: " + metodo);
+        };
     }
 
     // ------------------------------------------------------------------ métodos
 
     private Map<String, Object> inicializar(Map<String, Object> params) {
-        Object pedida = params.get("protocolVersion");
-        String versao = pedida instanceof String v && VERSOES_SUPORTADAS.contains(v) ? v : VERSAO_PROTOCOLO_PADRAO;
-        var r = new LinkedHashMap<String, Object>();
-        r.put("protocolVersion", versao);
-        r.put("capabilities", Map.of("tools", Map.of("listChanged", false)));
-        r.put("serverInfo", Map.of("name", "geo-explorer", "version", "1.0.0"));
-        r.put("instructions", "Use as ferramentas do Geo-Explorer para consultar trilhas, "
+        var resultado = new LinkedHashMap<String, Object>();
+        resultado.put("protocolVersion", negociarVersao(params.get("protocolVersion")));
+        resultado.put("capabilities", Map.of("tools", Map.of("listChanged", false)));
+        resultado.put("serverInfo", Map.of("name", "geo-explorer", "version", "1.0.0"));
+        resultado.put("instructions", "Use as ferramentas do Geo-Explorer para consultar trilhas, "
                 + "sortear desafios, gerar flash cards e certificados. Comece por listar_tecnologias.");
-        return r;
+        return resultado;
+    }
+
+    private static String negociarVersao(Object pedida) {
+        return pedida instanceof String versao && VERSOES_SUPORTADAS.contains(versao)
+                ? versao
+                : VERSAO_PROTOCOLO_PADRAO;
     }
 
     private Map<String, Object> listarFerramentas() {
@@ -120,64 +130,85 @@ public final class McpServer {
     }
 
     private Map<String, Object> chamarFerramenta(Map<String, Object> params) {
-        if (!(params.get("name") instanceof String nome)) {
-            throw new ErroRpc(INVALID_PARAMS, "Parâmetro 'name' é obrigatório");
-        }
-        Ferramenta f = ferramentas.get(nome);
-        if (f == null) {
-            throw new ErroRpc(INVALID_PARAMS, "Ferramenta desconhecida: " + nome);
-        }
-        Object brutos = params.getOrDefault("arguments", Map.of());
-        if (!(brutos instanceof Map<?, ?> m)) {
-            throw new ErroRpc(INVALID_PARAMS, "'arguments' deve ser um objeto");
-        }
-        Map<String, Object> args = cast(m);
+        Ferramenta ferramenta = localizarFerramenta(params.get("name"));
+        Map<String, Object> args = argumentos(params.getOrDefault("arguments", Map.of()));
 
         // Erros de validação e de negócio voltam como resultado com isError=true (padrão MCP),
         // para que o agente leia a mensagem e corrija a chamada sozinho.
-        List<String> erros = ValidadorArgumentos.validar(f.inputSchema(), args);
-        if (!erros.isEmpty()) {
+        List<String> erros = ValidadorArgumentos.validar(ferramenta.inputSchema(), args);
+
+        if (!erros.isEmpty())
             return conteudo("Argumentos inválidos: " + String.join("; ", erros), true);
-        }
+
         try {
-            return conteudo(f.handler().apply(args), false);
+            return conteudo(ferramenta.handler().apply(args), false);
         } catch (GeoExplorerException e) {
             return conteudo(e.getMessage(), true);
         }
     }
 
+    private Ferramenta localizarFerramenta(Object nome) {
+        if (!(nome instanceof String nomeTexto))
+            throw new ErroRpc(INVALID_PARAMS, "Parâmetro 'name' é obrigatório");
+
+        Ferramenta ferramenta = ferramentas.get(nomeTexto);
+
+        if (ferramenta == null)
+            throw new ErroRpc(INVALID_PARAMS, "Ferramenta desconhecida: " + nomeTexto);
+
+        return ferramenta;
+    }
+
+    private static Map<String, Object> argumentos(Object brutos) {
+        if (!(brutos instanceof Map<?, ?> mapa))
+            throw new ErroRpc(INVALID_PARAMS, "'arguments' deve ser um objeto");
+
+        return cast(mapa);
+    }
+
     // ------------------------------------------------------------------ apoio
 
+    private static Map<String, Object> parametros(Map<String, Object> requisicao) {
+        return requisicao.get("params") instanceof Map<?, ?> params ? cast(params) : Map.of();
+    }
+
+    private static String responderErro(boolean notificacao, Object id, int codigo, String mensagem) {
+        return notificacao ? null : Json.stringify(erro(id, codigo, mensagem));
+    }
+
     private static Map<String, Object> conteudo(String texto, boolean erro) {
-        var r = new LinkedHashMap<String, Object>();
-        r.put("content", List.of(Map.of("type", "text", "text", texto)));
-        r.put("isError", erro);
-        return r;
+        var conteudo = new LinkedHashMap<String, Object>();
+        conteudo.put("content", List.of(Map.of("type", "text", "text", texto)));
+        conteudo.put("isError", erro);
+        return conteudo;
     }
 
     private static Map<String, Object> sucesso(Object id, Object resultado) {
-        var r = new LinkedHashMap<String, Object>();
-        r.put("jsonrpc", "2.0");
-        r.put("id", id);
-        r.put("result", resultado);
-        return r;
+        var resposta = envelope(id);
+        resposta.put("result", resultado);
+        return resposta;
     }
 
     private static Map<String, Object> erro(Object id, int codigo, String mensagem) {
-        var r = new LinkedHashMap<String, Object>();
-        r.put("jsonrpc", "2.0");
-        r.put("id", id);
-        r.put("error", Map.of("code", codigo, "message", mensagem));
-        return r;
+        var resposta = envelope(id);
+        resposta.put("error", Map.of("code", codigo, "message", mensagem));
+        return resposta;
+    }
+
+    private static Map<String, Object> envelope(Object id) {
+        var resposta = new LinkedHashMap<String, Object>();
+        resposta.put("jsonrpc", VERSAO_JSON_RPC);
+        resposta.put("id", id);
+        return resposta;
     }
 
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> cast(Map<?, ?> m) {
-        return (Map<String, Object>) m;
+    private static Map<String, Object> cast(Map<?, ?> mapa) {
+        return (Map<String, Object>) mapa;
     }
 
-    private static void log(String msg) {
-        System.err.println("[geo-explorer-mcp] " + msg);
+    private static void log(String mensagem) {
+        System.err.println("[geo-explorer-mcp] " + mensagem);
     }
 
     private static final class ErroRpc extends RuntimeException {

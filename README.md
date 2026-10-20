@@ -17,12 +17,13 @@ O Geo-Explorer consulta uma base fictícia de trilhas, sorteia desafios prático
 2. [Comandos](#comandos)
 3. [Servidor MCP](#servidor-mcp)
 4. [Arquitetura e decisões](#arquitetura-e-decisões)
-5. [Como o IBM Bob foi usado](#como-o-ibm-bob-foi-usado)
-6. [Prompts em pontos críticos](#prompts-em-pontos-críticos)
-7. [Intervenção humana](#intervenção-humana)
-8. [Métricas do Bobalytics](#métricas-do-bobalytics)
-9. [Testes](#testes)
-10. [Aprendizados](#aprendizados)
+5. [Padrões de código](#padrões-de-código)
+6. [Como o IBM Bob foi usado](#como-o-ibm-bob-foi-usado)
+7. [Prompts em pontos críticos](#prompts-em-pontos-críticos)
+8. [Intervenção humana](#intervenção-humana)
+9. [Métricas do Bobalytics](#métricas-do-bobalytics)
+10. [Testes](#testes)
+11. [Aprendizados](#aprendizados)
 
 ---
 
@@ -161,6 +162,43 @@ flowchart LR
 | **Erros de uso como `GeoExplorerException`** | O usuário vê mensagens claras; o agente MCP recebe `isError` e se corrige. | Stack traces |
 | **Records e enum para o modelo** | Imutabilidade e menos código. | Classes com getters/setters |
 | **Validação forte no certificado** | Nome vira nome de arquivo: bloqueia `../`, `<script>` e nomes enormes; caminho final verificado dentro de `output/`. | Confiar na entrada |
+
+---
+
+## Padrões de código
+
+O código passou por uma refatoração de *clean code* sem mudar o comportamento: os 38 testes continuam passando e o build com `-Xlint:all` não gera avisos.
+
+**`if`, `for` e `while` com um único comando ficam sem chaves**, seguidos de uma linha em branco. Blocos com mais de um comando mantêm as chaves.
+
+```java
+if (estaVazio(tecnologia))
+    throw new GeoExplorerException("Informe uma tecnologia. Disponíveis: " + listaDeIds() + ".");
+
+for (int i = 0; i < modulos.size(); i++)
+    appendModulo(md, i + 1, modulos.get(i));
+```
+
+> ⚠️ Sem chaves, só a primeira linha pertence ao `if`/`for`. Quando o corpo precisaria de mais de um comando, ele vira um método próprio (como `appendModulo`) em vez de voltar a ter chaves.
+
+**Regra do Bob atualizada.** A Custom Rule [`.bob/rules/02-java.md`](.bob/rules/02-java.md) exigia "chaves sempre presentes", o que contradizia esse padrão e faria o Bob voltar a colocar as chaves. A regra foi corrigida para:
+
+- tirar as chaves de `if`, `else`, `for` e `while` com um único comando;
+- manter as chaves quando há mais de um comando e, se o corpo crescer, extrair um método;
+- seguir as convenções de *clean code* da tabela abaixo.
+
+Assim, o código, este README e as instruções do Bob seguem a mesma convenção.
+
+Outras convenções aplicadas:
+
+| Convenção | Exemplos |
+|---|---|
+| **Nomes que se explicam** | `trilha`, `desafio`, `modulo` e `card` no lugar de `t`, `d`, `m` e `c`; `linhaReaproveitada` no lugar de `tmp` |
+| **Métodos pequenos, com uma responsabilidade** | `resolverNivel`, `sortearDesafio`, `filtrarPorCategoria`, `localizarComando`, `localizarFerramenta`, `paraModulo`, `paraDesafio` |
+| **Sem números mágicos** | `QUANTIDADE_PADRAO_CARDS`, `DISTANCIA_MAXIMA_SUGESTAO`, `BYTES_CODIGO_CERTIFICADO`, `MAX_TEXTO_CURTO` |
+| **Sem duplicação** | `estaVazio()` e `sortear()` no serviço; `envelope()` e `responderErro()` no MCP; `escreverObjeto`/`escreverArray` e `lerSeparador` no JSON; `converter()` no repositório |
+| **Retorno antecipado em vez de `else`** | `resolverNivel`, `lerQuantidade`, `fecharToken` |
+| **Estado encapsulado** | O tokenizador do `CommandRouter` virou a classe interna `Tokenizador`, com um método para cada situação (dentro de aspas, abrir aspas, espaço, caractere comum) |
 
 ---
 
