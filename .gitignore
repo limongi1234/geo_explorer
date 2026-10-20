@@ -1,0 +1,9 @@
+target/
+output/*.md
+!output/.gitkeep
+.idea/
+*.iml
+.vscode/
+.env
+*.log
+.DS_Store

@@ -1,0 +1,136 @@
+{
+  "versao": "1.0.0",
+  "observacao": "Base fictícia criada para fins educacionais no desafio Geo-Explorer (DIO + IBM Bob).",
+  "trilhas": [
+    {
+      "id": "java",
+      "nome": "Java",
+      "aliases": ["jdk", "java25"],
+      "descricao": "Da sintaxe ao back-end moderno com Java 25, orientação a objetos e testes.",
+      "cargaHoraria": 60,
+      "xp": 1200,
+      "modulos": [
+        { "titulo": "Fundamentos da linguagem", "horas": 12, "topicos": ["Tipos e variáveis", "Controle de fluxo", "Métodos", "Strings e text blocks"] },
+        { "titulo": "Orientação a objetos", "horas": 14, "topicos": ["Classes e objetos", "Herança e interfaces", "Records", "Sealed classes"] },
+        { "titulo": "Coleções e Streams", "horas": 12, "topicos": ["List, Set e Map", "Sequenced collections", "Streams API", "Optional"] },
+        { "titulo": "Recursos modernos", "horas": 10, "topicos": ["Pattern matching", "Switch expressions", "Virtual threads", "Módulos"] },
+        { "titulo": "Qualidade e testes", "horas": 12, "topicos": ["JUnit 5", "Maven", "Clean code", "Refatoração"] }
+      ],
+      "desafios": [
+        { "nivel": "iniciante", "titulo": "Calculadora de médias", "descricao": "Leia notas de um aluno e informe média e situação (aprovado, recuperação, reprovado).", "criterios": ["Validar entradas inválidas", "Usar switch expression", "Cobrir os três cenários com testes"] },
+        { "nivel": "iniciante", "titulo": "Agenda de contatos", "descricao": "Cadastre, liste e busque contatos em memória usando records.", "criterios": ["Modelar Contato como record", "Impedir duplicados", "Busca sem diferenciar maiúsculas"] },
+        { "nivel": "intermediario", "titulo": "Relatório de vendas com Streams", "descricao": "Agrupe vendas por categoria e mês e mostre o top 3 de produtos.", "criterios": ["Usar Collectors.groupingBy", "Sem laços for explícitos", "Testes com dados fixos"] },
+        { "nivel": "intermediario", "titulo": "Biblioteca com sealed classes", "descricao": "Modele itens de biblioteca (livro, revista, e-book) e calcule multas por atraso.", "criterios": ["Hierarquia selada", "Pattern matching no cálculo", "Testes por tipo de item"] },
+        { "nivel": "avancado", "titulo": "Crawler com virtual threads", "descricao": "Processe 10 mil tarefas simuladas de I/O com virtual threads e compare com um pool fixo.", "criterios": ["Medir tempo das duas abordagens", "Tratar exceções por tarefa", "Documentar os resultados"] },
+        { "nivel": "avancado", "titulo": "Motor de regras plugável", "descricao": "Crie um motor de regras de desconto em que novas regras entram sem alterar o código existente.", "criterios": ["Aplicar Open/Closed", "Regras combináveis", "Cobertura de testes acima de 80%"] }
+      ],
+      "cards": [
+        { "categoria": "fundamentos", "pergunta": "Qual a diferença entre == e equals() em objetos?", "resposta": "== compara referências; equals() compara o conteúdo conforme a implementação da classe." },
+        { "categoria": "poo", "pergunta": "Para que serve um record?", "resposta": "Para modelar dados imutáveis com construtor, getters, equals, hashCode e toString gerados." },
+        { "categoria": "streams", "pergunta": "O que é uma operação terminal em Streams?", "resposta": "A operação que dispara o processamento e produz um resultado, como collect, count ou forEach." },
+        { "categoria": "moderno", "pergunta": "Qual a vantagem das virtual threads?", "resposta": "Permitem milhares de tarefas concorrentes de I/O com custo baixo, sem pools complexos." },
+        { "categoria": "testes", "pergunta": "O que faz a anotação @BeforeEach no JUnit 5?", "resposta": "Executa o método anotado antes de cada teste da classe." }
+      ]
+    },
+    {
+      "id": "python",
+      "nome": "Python",
+      "aliases": ["py"],
+      "descricao": "Programação, automação e análise de dados com Python.",
+      "cargaHoraria": 48,
+      "xp": 950,
+      "modulos": [
+        { "titulo": "Primeiros passos", "horas": 10, "topicos": ["Tipos básicos", "Condicionais e laços", "Funções", "f-strings"] },
+        { "titulo": "Estruturas de dados", "horas": 10, "topicos": ["Listas e tuplas", "Dicionários", "Conjuntos", "Comprehensions"] },
+        { "titulo": "Orientação a objetos", "horas": 10, "topicos": ["Classes", "Dataclasses", "Herança", "Métodos mágicos"] },
+        { "titulo": "Automação e dados", "horas": 18, "topicos": ["Arquivos e CSV", "Requisições HTTP", "pandas", "Testes com pytest"] }
+      ],
+      "desafios": [
+        { "nivel": "iniciante", "titulo": "Conversor de temperaturas", "descricao": "Converta entre Celsius, Fahrenheit e Kelvin a partir da entrada do usuário.", "criterios": ["Funções separadas por conversão", "Tratar entrada inválida", "Testes com pytest"] },
+        { "nivel": "intermediario", "titulo": "Organizador de arquivos", "descricao": "Organize uma pasta movendo arquivos para subpastas por extensão.", "criterios": ["Usar pathlib", "Modo simulação (dry-run)", "Log das operações"] },
+        { "nivel": "avancado", "titulo": "Painel de dados públicos", "descricao": "Leia um CSV de dados abertos e gere indicadores agregados por região.", "criterios": ["Limpeza de dados com pandas", "Indicadores reproduzíveis", "README com conclusões"] }
+      ],
+      "cards": [
+        { "categoria": "fundamentos", "pergunta": "Qual a diferença entre lista e tupla?", "resposta": "Listas são mutáveis; tuplas são imutáveis." },
+        { "categoria": "estruturas", "pergunta": "O que é uma list comprehension?", "resposta": "Uma forma concisa de criar listas a partir de iteráveis, com filtro opcional." },
+        { "categoria": "poo", "pergunta": "Para que serve @dataclass?", "resposta": "Gera automaticamente __init__, __repr__ e __eq__ para classes de dados." },
+        { "categoria": "testes", "pergunta": "Como o pytest identifica testes?", "resposta": "Por arquivos e funções cujo nome começa com test_." }
+      ]
+    },
+    {
+      "id": "javascript",
+      "nome": "JavaScript",
+      "aliases": ["js", "node"],
+      "descricao": "A linguagem da web: do navegador ao back-end com Node.js.",
+      "cargaHoraria": 44,
+      "xp": 900,
+      "modulos": [
+        { "titulo": "Fundamentos", "horas": 10, "topicos": ["let e const", "Funções e arrow functions", "Arrays e objetos", "Desestruturação"] },
+        { "titulo": "DOM e eventos", "horas": 10, "topicos": ["Seletores", "Eventos", "Manipulação do DOM", "Formulários"] },
+        { "titulo": "Assincronismo", "horas": 12, "topicos": ["Promises", "async/await", "fetch", "Tratamento de erros"] },
+        { "titulo": "Node.js", "horas": 12, "topicos": ["Módulos ES", "npm", "Servidor HTTP", "Testes com node:test"] }
+      ],
+      "desafios": [
+        { "nivel": "iniciante", "titulo": "Lista de tarefas", "descricao": "Crie uma lista de tarefas no navegador com adicionar, concluir e remover.", "criterios": ["Sem bibliotecas externas", "Estado salvo no localStorage", "Layout responsivo"] },
+        { "nivel": "intermediario", "titulo": "Buscador de CEP", "descricao": "Consulte uma API pública de CEP e exiba o endereço com tratamento de erro.", "criterios": ["Usar async/await", "Mensagens de erro amigáveis", "Indicador de carregamento"] },
+        { "nivel": "avancado", "titulo": "API REST em Node.js", "descricao": "Implemente uma API de livros com CRUD completo e testes.", "criterios": ["Validação de entrada", "Códigos HTTP corretos", "Testes automatizados"] }
+      ],
+      "cards": [
+        { "categoria": "fundamentos", "pergunta": "Qual a diferença entre let e const?", "resposta": "const impede reatribuição da variável; let permite." },
+        { "categoria": "assincronismo", "pergunta": "O que async/await faz?", "resposta": "Permite escrever código baseado em Promises com aparência sequencial." },
+        { "categoria": "dom", "pergunta": "Para que serve event.preventDefault()?", "resposta": "Cancela o comportamento padrão do navegador para o evento, como o envio de um formulário." },
+        { "categoria": "node", "pergunta": "O que é o package.json?", "resposta": "O manifesto do projeto Node com nome, versão, scripts e dependências." }
+      ]
+    },
+    {
+      "id": "react",
+      "nome": "React",
+      "aliases": ["reactjs"],
+      "descricao": "Interfaces declarativas e componentizadas com React.",
+      "cargaHoraria": 40,
+      "xp": 850,
+      "modulos": [
+        { "titulo": "Componentes e JSX", "horas": 8, "topicos": ["JSX", "Props", "Composição", "Listas e keys"] },
+        { "titulo": "Estado e efeitos", "horas": 12, "topicos": ["useState", "useEffect", "Formulários controlados", "Elevação de estado"] },
+        { "titulo": "Arquitetura", "horas": 10, "topicos": ["Context API", "Hooks customizados", "Rotas", "Organização de pastas"] },
+        { "titulo": "Qualidade", "horas": 10, "topicos": ["Testing Library", "Acessibilidade", "Performance", "Deploy"] }
+      ],
+      "desafios": [
+        { "nivel": "iniciante", "titulo": "Cartão de perfil", "descricao": "Monte um componente de perfil reutilizável recebendo dados por props.", "criterios": ["Componente puro", "Props tipadas ou validadas", "Acessível por teclado"] },
+        { "nivel": "intermediario", "titulo": "Catálogo com filtros", "descricao": "Liste produtos com busca, filtro por categoria e ordenação.", "criterios": ["Estado derivado sem duplicação", "Hook customizado de filtro", "Testes de interação"] },
+        { "nivel": "avancado", "titulo": "Painel com autenticação simulada", "descricao": "Crie um painel com rotas protegidas e contexto de usuário.", "criterios": ["Context API", "Rotas protegidas", "Tratamento de carregamento e erro"] }
+      ],
+      "cards": [
+        { "categoria": "componentes", "pergunta": "O que são props?", "resposta": "Dados passados de um componente pai para um filho, somente leitura no filho." },
+        { "categoria": "hooks", "pergunta": "Quando o useEffect com array vazio executa?", "resposta": "Uma vez, após a primeira renderização do componente." },
+        { "categoria": "listas", "pergunta": "Por que listas precisam de key?", "resposta": "Para o React identificar cada item entre renderizações e atualizar só o necessário." },
+        { "categoria": "arquitetura", "pergunta": "Para que serve a Context API?", "resposta": "Compartilhar dados entre componentes sem passar props por todos os níveis." }
+      ]
+    },
+    {
+      "id": "sql",
+      "nome": "SQL",
+      "aliases": ["banco-de-dados", "database"],
+      "descricao": "Modelagem e consultas em bancos de dados relacionais.",
+      "cargaHoraria": 32,
+      "xp": 700,
+      "modulos": [
+        { "titulo": "Modelagem relacional", "horas": 8, "topicos": ["Entidades e relacionamentos", "Chaves primárias e estrangeiras", "Normalização"] },
+        { "titulo": "Consultas", "horas": 10, "topicos": ["SELECT e WHERE", "ORDER BY e LIMIT", "Funções de agregação", "GROUP BY e HAVING"] },
+        { "titulo": "Junções e subconsultas", "horas": 8, "topicos": ["INNER e LEFT JOIN", "Subconsultas", "CTEs"] },
+        { "titulo": "Desempenho", "horas": 6, "topicos": ["Índices", "Planos de execução", "Transações"] }
+      ],
+      "desafios": [
+        { "nivel": "iniciante", "titulo": "Consultas de uma loja", "descricao": "Escreva consultas para listar clientes, pedidos e totais de uma loja fictícia.", "criterios": ["Uso correto de WHERE", "Ordenação", "Agregações simples"] },
+        { "nivel": "intermediario", "titulo": "Relatório de vendas", "descricao": "Gere o faturamento mensal por vendedor usando joins e agrupamentos.", "criterios": ["JOIN entre três tabelas", "GROUP BY e HAVING", "Resultado validado com dados de teste"] },
+        { "nivel": "avancado", "titulo": "Otimização de consultas", "descricao": "Analise consultas lentas e proponha índices com evidência de ganho.", "criterios": ["EXPLAIN antes e depois", "Justificativa de cada índice", "Medição de tempo"] }
+      ],
+      "cards": [
+        { "categoria": "consultas", "pergunta": "Qual a diferença entre WHERE e HAVING?", "resposta": "WHERE filtra linhas antes do agrupamento; HAVING filtra grupos depois do GROUP BY." },
+        { "categoria": "joins", "pergunta": "O que o LEFT JOIN retorna?", "resposta": "Todas as linhas da tabela da esquerda e as correspondentes da direita, ou NULL quando não houver." },
+        { "categoria": "modelagem", "pergunta": "Para que serve uma chave estrangeira?", "resposta": "Para garantir a integridade da referência entre duas tabelas." },
+        { "categoria": "desempenho", "pergunta": "Qual o custo de um índice?", "resposta": "Ele acelera leituras, mas ocupa espaço e deixa inserções e atualizações mais lentas." }
+      ]
+    }
+  ]
+}

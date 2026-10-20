@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "geo-explorer": {
+      "command": "java",
+      "args": ["-jar", "target/geo-explorer.jar", "--mcp"],
+      "alwaysAllow": ["listar_tecnologias", "buscar_trilha"],
+      "disabled": false
+    }
+  }
+}
